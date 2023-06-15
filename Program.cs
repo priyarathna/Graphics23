@@ -25,7 +25,62 @@ class MyWindow : Window {
       image.Source = mBmp;
       Content = image;
 
-      DrawMandelbrot (-0.5, 0, 1);
+      //DrawMandelbrot (-0.5, 0, 1);
+
+      MouseDown += OnMouseDown;
+   }
+
+   void OnMouseDown (object sender, MouseButtonEventArgs e) {
+      var pt = e.GetPosition (this);
+      if (mStartPt == null) mStartPt = pt;
+      else {
+         try {
+            mBmp.Lock ();
+            mBase = mBmp.BackBuffer;
+            // Bresenham's line algorithm
+            int x0 = (int)mStartPt.Value.X, y0 = (int)mStartPt.Value.Y, x1 = (int)pt.X, y1 = (int)pt.Y;
+            if (Math.Abs (y1 - y0) < Math.Abs (x1 - x0)) {
+               if (x0 > x1) (x0, y0, x1, y1) = (x1, y1, x0, y0);
+               PlotLineLow (x0, y0, x1, y1);
+            } else {
+               if (y0 > y1) (x0, y0, x1, y1) = (x1, y1, x0, y0);
+               PlotLineHigh (x0, y0, x1, y1);
+            }
+         } finally { mBmp.Unlock (); mStartPt = null; }
+      }
+
+      void PlotLineLow (int x0, int y0, int x1, int y1) {
+         int deltaX = x1 - x0, deltaY = y1 - y0, x = x0, y = y0, delta = 1;
+         if (deltaY < 0) {
+            delta = -1; deltaY = -deltaY;
+         }
+         var factor = (2 * deltaY) - deltaX;
+         for (; x < x1; x++) {
+            SetPixel (x, y, 255);
+            mBmp.AddDirtyRect (new Int32Rect (x, y, 1, 1));
+            if (factor > 0) {
+               y += delta;
+               factor += 2 * (deltaY - deltaX);
+            } else factor += 2 * deltaY;
+         }
+      }
+
+      void PlotLineHigh (int x0, int y0, int x1, int y1) {
+         int deltaX = x1 - x0, deltaY = y1 - y0, x = x0, y = y0, delta = 1;
+         if (deltaX < 0) {
+            delta = -1; deltaX = -deltaX;
+         }
+         var factor = (2 * deltaX) - deltaY;
+         for (; y < y1; y++) {
+            SetPixel (x, y, 255);
+            mBmp.AddDirtyRect (new Int32Rect (x, y, 1, 1));
+            if (factor > 0) {
+               x += delta;
+               factor += 2 * (deltaX - deltaY);
+            } else factor += 2 * deltaX;
+         }
+      }
+
    }
 
    void DrawMandelbrot (double xc, double yc, double zoom) {
@@ -96,6 +151,7 @@ class MyWindow : Window {
    WriteableBitmap mBmp;
    int mStride;
    nint mBase;
+   Point? mStartPt;
 }
 
 internal class Program {
