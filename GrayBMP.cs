@@ -74,6 +74,21 @@ class GrayBMP {
       Dirty (x1, y1); Dirty (x2, y2);
    }
 
+   public void DrawHorizontalLine (int x1, int x2, int y) {
+      Begin ();
+      int stepX = x1 < x2 ? 1 : -1;
+      byte bGray = 255;
+      unsafe {
+         byte* ptr = (byte*)(Buffer + y * mStride + x1);
+         while (true) {
+            *ptr = bGray;
+            if (x1 == x2) break;
+            x1 += stepX; ptr += stepX;
+         }
+      }
+      End ();
+   }
+
    /// <summary>Draws a line between the given endpoints, with the given shade of gray</summary>
    public void DrawLine (int x1, int y1, int x2, int y2, int gray) {
       Begin ();
