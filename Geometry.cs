@@ -21,6 +21,15 @@ readonly record struct Point2 (double X, double Y) {
    public (int X, int Y) Round () => ((int)(X + 0.5), (int)(Y + 0.5));
 
    public double AngleTo (Point2 b) => Math.Atan2 (b.Y - Y, b.X - X);
+
+   /// <summary>Returns true if the given point lies to the _left_ (or exactly on) the line a-b</summary>
+   /// If the input point is within Epsilon distance of the line a-b, then this returns true. So,
+   /// it really means LeftOfOrExactlyOn. 
+   public bool LeftOf (Point2 a, Point2 b) {
+      double cross = (b.X - a.X) * (Y - a.Y) - (X - a.X) * (b.Y - a.Y);
+      return cross > -1e-6;
+   }
+
    public Point2 RadialMove (double r, double th) => new (X + r * Cos (th), Y + r * Sin (th));
 
    public static Vector2 operator - (Point2 a, Point2 b) => new (a.X - b.X, a.Y - b.Y);
@@ -130,7 +139,19 @@ class Polygon {
 class Drawing {
    public void Add (Polygon poly) {
       mPolys.Add (poly);
-      mBound = new (); 
+      mBound = new ();
+      if (mConvexHull.Count == 0) return;
+      double x = poly.Pts[0].X, y = poly.Pts[0].Y;
+      var pts = new List<Point2> ();
+      pts.AddRange (poly.Pts);
+      Point2 pt1, pt2;
+      for (int i = 0; i < mConvexHull.Count; i += 2) {
+         pt1 = mConvexHull[i]; pt2 = mConvexHull[(i + 1) % mConvexHull.Count];
+         if (IsVisibleEdge (new Point2 (x, y), pt1, pt2)) {
+            pts.Add (pt1); pts.Add (pt2);
+         }
+      }
+      mConvexHull = GetConvexHull (pts);
    }
 
    public IReadOnlyList<Polygon> Polys => mPolys;
@@ -150,10 +171,46 @@ class Drawing {
    }
    Bound2 mBound;
 
-   public Bound2 GetBound (Matrix2 xfm) 
-      => new Bound2 (Polys.SelectMany (a => a.Pts.Select (p => p * xfm)));
+   IReadOnlyList<Point2> ConvexHull {
+      get {
+         if (mConvexHull.Count == 0)
+            mConvexHull = GetConvexHull (Polys.SelectMany (a => a.Pts.Select (a => a)));
+         return mConvexHull;
+      }
+   }
+   List<Point2> mConvexHull = new ();
+
+   public Bound2 GetBound (Matrix2 xfm)
+      => new (ConvexHull.Select (p => p * xfm));
 
    /// <summary>Enumerate all the lines in this drawing</summary>
-   public IEnumerable<(Point2 A, Point2 B)> EnumLines (Matrix2 xfm) 
+   public IEnumerable<(Point2 A, Point2 B)> EnumLines (Matrix2 xfm)
       => mPolys.SelectMany (a => a.EnumLines (xfm));
+
+   public IEnumerable<(Point2 A, Point2 B)> EnumConvexHullLines (Matrix2 xfm) {
+      Point2 p0 = mConvexHull[^1] * xfm;
+      for (int i = 0, n = mConvexHull.Count; i < n; i++) {
+         Point2 p1 = mConvexHull[i] * xfm;
+         yield return (p0, p1);
+         p0 = p1;
+      }
+   }
+
+   List<Point2> GetConvexHull (IEnumerable<Point2> pts) {
+      var p0 = pts.OrderBy (pt => pt.Y).ThenBy (pt => pt.X).First ();
+      var points = pts.OrderBy (pt => p0.AngleTo (pt)).ToArray ();
+      List<Point2> res = new () { points[0], points[1] };
+      foreach (var pt in points[2..]) {
+         while (res.Count > 1 && !pt.LeftOf (res[^2], res[^1]))
+            res.RemoveAt (res.Count - 1);
+         res.Add (pt);
+      }
+      return res;
+   }
+
+   bool IsVisibleEdge (Point2 pt, Point2 start, Point2 end) {
+      Point2 pt1 = new (start.X - pt.X, start.Y - pt.Y);
+      Point2 pt2 = new (end.X - pt.X, end.Y - pt.Y);
+      return ((pt1.X * pt2.Y) - (pt1.Y * pt2.X)) > 0;
+   }
 }

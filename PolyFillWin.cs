@@ -47,8 +47,8 @@ class PolyFillWin : Window {
       mBmp.Begin ();
       mBmp.Clear (192);
       int thick = 2;
-      for (int x = 50; x < 850; x += 100, thick += 5) 
-         mBmp.DrawThickLine (new Point2(50, 550), new (x, 50), thick, 0);
+      for (int x = 50; x < 850; x += 100, thick += 5)
+         mBmp.DrawThickLine (new Point2 (50, 550), new (x, 50), thick, 0);
       mBmp.End ();
    }
 
@@ -56,13 +56,20 @@ class PolyFillWin : Window {
       mBmp.Begin ();
       mBmp.Clear (192);
 
+      if (mRotate == 90)
+         mDwg.Add (new Polygon (new List<Point2> ()
+         { new Point2 (-50, 0), new Point2 (-50, 600), new Point2 (900, 600), new Point2 (900, 0) }));
+      else if (mRotate == 180)
+         mDwg.Add (new Polygon (new List<Point2> ()
+         { new Point2 (-200, 0), new Point2 (1000, 0), new Point2 (600, 800) }));
+
       Matrix2 xfm1 = Matrix2.Rotation (mRotate * Math.PI / 180);
       var bound = mDwg.GetBound (xfm1);
       var xfm2 = ComposeViewXfm (bound, mBmp.Width, mBmp.Height, 20);
 
       Matrix2 xfm = xfm1 * xfm2;
       mPF.Reset ();
-      foreach (var (a, b) in mDwg.EnumLines (xfm))
+      foreach (var (a, b) in mDwg.EnumConvexHullLines (xfm))
          mPF.AddLine (a, b);
       mPF.Fill (mBmp, 255);
       foreach (var (a, b) in mDwg.EnumLines (xfm))
